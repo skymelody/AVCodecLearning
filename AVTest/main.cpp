@@ -1,18 +1,21 @@
 #include <string>
 #include <iostream>
-#include "PixelFormat.h"
-#include "Utils.h"
+#include "ImageUtils.h"
+#include "CommonUtils.h"
 
 int main()
 {
 	const std::string saveFilePath =
-	 	R"(C:\Users\a_sim\Desktop\out.yuv)";
+	 	R"(C:\Users\a_sim\Desktop\out.rgb)";
+
 	const auto func = [&] {
-		auto image = PixelFormat::gen_rbg_stride_horizontal(1920, 1080);
-		PixelFormat::write_rgb_as_yuv(saveFilePath, image);
+		auto rgb_image = ImageUtils::gen_rbg_stride_horizontal(1920, 1080);
+		auto yuv_image = ImageUtils::convert_rgb_to_yuv(rgb_image);
+		rgb_image = ImageUtils::convert_yuv_to_rgb(yuv_image);
+		ImageUtils::write_grb_to_file(saveFilePath, rgb_image);
 	};
 
-	auto time_consume = Utils::GetRoutineExecuteTimeConsume(func);
+	auto time_consume = CommonUtils::get_routine_execute_time_consume(func);
 	printf("%.20f\n", time_consume);
 
 	return 0;

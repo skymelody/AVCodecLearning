@@ -20,12 +20,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PixelFormat.h" />
-    <ClInclude Include="Utils.h" />
+    <ClInclude Include="CommonUtils.h" />
+    <ClInclude Include="ImageUtils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ImageUtils.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PixelFormat.cpp" />
-    <ClCompile Include="Utils.cpp" />
+    <ClCompile Include="CommonUtils.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

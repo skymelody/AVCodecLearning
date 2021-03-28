@@ -1,17 +1,59 @@
-#include "PixelFormat.h"
+#include "ImageUtils.h"
 #include <cstdio>
 #include <functional>
-#include <cstdlib>
-#include <ctime>
 #include <algorithm>
+
+#include "CommonUtils.h"
 
 #define CHECK_WIDTH_AND_HEIGHT(width, height) \
 	if (width <= 0 || height <= 0) { \
 		return Rgb24Image({}, 0, 0);\
 	}
 
-namespace PixelFormat
+namespace ImageUtils
 {
+
+	static uint8_t rgb_pixel_to_y(const Rgb24Pixel& pixel)
+	{
+		const int y = 16 + 0.257 * pixel._r + 0.504 * pixel._g + 0.098 * pixel._b;
+		const int clip_y = CommonUtils::clip_value(y, 0, 255);
+		return static_cast<uint8_t>(clip_y);
+	}
+
+	static uint8_t rgb_pixel_to_u(const Rgb24Pixel& pixel)
+	{
+		const int u = 128 - 0.148 * pixel._r - 0.291 * pixel._g + 0.439 * pixel._b;
+		const int clip_u = CommonUtils::clip_value(u, 0, 255);
+		return static_cast<uint8_t>(clip_u);
+	}
+
+	static uint8_t rgb_pixel_to_v(const Rgb24Pixel& pixel)
+	{
+		const int v = 128 + 0.439 * pixel._r - 0.368 * pixel._g - 0.071 * pixel._b;
+		const int clip_v = CommonUtils::clip_value(v, 0, 255);
+		return static_cast<uint8_t>(clip_v);
+	}
+
+	static uint8_t yuv_pixel_to_r(const YuvPixel& pixel)
+	{
+		const int r = 1.164 * (pixel._y - 16) + 1.596 * (pixel._v - 128);
+		const int clip_r = CommonUtils::clip_value(r, 0, 255);
+		return static_cast<uint8_t>(clip_r);
+	}
+
+	static uint8_t yuv_pixel_to_g(const YuvPixel& pixel)
+	{
+		const int g = 1.164 * (pixel._y - 16) - 0.813 * (pixel._v - 128) - 0.391 * (pixel._u - 128);
+		const int clip_g = CommonUtils::clip_value(g, 0, 255);
+		return static_cast<uint8_t>(clip_g);
+	}
+
+	static uint8_t yuv_pixel_to_b(const YuvPixel& pixel)
+	{
+		const int b = 1.164 * (pixel._y - 16) + 2.018 * (pixel._u - 128);
+		const int clip_b = CommonUtils::clip_value(b, 0, 255);
+		return static_cast<uint8_t>(clip_b);
+	}
 
 	static std::vector<Rgb24Pixel> get_stride_pixel_map()
 	{
@@ -113,19 +155,52 @@ namespace PixelFormat
 	{
 		CHECK_WIDTH_AND_HEIGHT(width, height);
 
-		std::vector<Rgb24Pixel> pixels;
-		const int npixels = width * height;
-		for (int i = 0; i < npixels; ++i)
+		std::vector<Rgb24Pixel> pixels(width*height);
+		for (int i = 0; i < pixels.size(); ++i)
 		{
-			pixels.push_back(pixel);
+			pixels[i] = pixel;
 		}
 		return { pixels, width, height };
 	}
 
+	// Rgb24Image convert_yuv_to_rgb(const YuvImage& yuv_image)
+	// {
+	// 	const auto& yuv_pixels = yuv_image._pixels;
+	// 	const int width = yuv_image._width;
+	// 	const int height = yuv_image._height;
+	// 	std::vector<Rgb24Pixel> rgb_pixels(yuv_pixels.size());
+
+	// 	for (int i = 0; i < rgb_pixels.size(); ++i)
+	// 	{
+	// 		rgb_pixels[i]._r = yuv_pixel_to_r(yuv_pixels[i]);
+	// 		rgb_pixels[i]._g = yuv_pixel_to_g(yuv_pixels[i]);
+	// 		rgb_pixels[i]._b = yuv_pixel_to_b(yuv_pixels[i]);
+	// 	}
+
+	// 	return { rgb_pixels, width, height };
+	// }
+
+	YuvImage convert_rgb_to_yuv(const Rgb24Image& rgb_image)
+	{
+		const auto& rgb_pixels = rgb_image._pixels;
+		const int width = rgb_image._width;
+		const int height = rgb_image._height;
+		std::vector<YuvPixel> yuv_pixels(rgb_pixels.size());
+
+		for (int i = 0; i < yuv_pixels.size(); ++i)
+		{
+			yuv_pixels[i]._y = rgb_pixel_to_y(rgb_pixels[i]);
+			yuv_pixels[i]._u = rgb_pixel_to_u(rgb_pixels[i]);
+			yuv_pixels[i]._v = rgb_pixel_to_v(rgb_pixels[i]);
+		}
+
+		return { yuv_pixels, width, height };
+	}
+
 	bool write_rgb_as_yuv(const std::string& path, const Rgb24Image image)
 	{
-		FILE* file = fopen(path.c_str(), "wb+");
-		if (file == nullptr)
+		CommonUtils::DataDumper dumper(path);
+		if (!dumper.open())
 		{
 			return false;
 		}
@@ -142,7 +217,7 @@ namespace PixelFormat
 				int col = i - row * image._width;
 				if (write_predicate == nullptr || write_predicate(row, col))
 				{
-					fwrite(&data, 1, 1, file);
+					dumper.dump(data);
 				}
 			}
 		};
@@ -161,36 +236,33 @@ namespace PixelFormat
 
 		trans_and_save([](const Rgb24Pixel& pixel)
 		{
-			return 16 + 0.257 * pixel._r + 0.504 * pixel._g + 0.098 * pixel._b;
+			return rgb_pixel_to_y(pixel);
 		}, nullptr);
 		trans_and_save([](const Rgb24Pixel& pixel) 
 		{
-			return 128 - 0.148 * pixel._r - 0.291 * pixel._g + 0.439 * pixel._b;
+			return rgb_pixel_to_u(pixel);
 		}, u_write_predicate);
 		trans_and_save([](const Rgb24Pixel& pixel)
 		{
-			return 128 + 0.439 * pixel._r - 0.368 * pixel._g - 0.071 * pixel._b;
+			return rgb_pixel_to_v(pixel);
 		}, v_write_predicate);
 		
-		fflush(file);
-
 		return true;
 	}
 
 	bool write_grb_to_file(const std::string& path, const Rgb24Image image)
 	{
-		FILE* file = fopen(path.c_str(), "wb+");
-		if (file == nullptr)
+		CommonUtils::DataDumper dumper(path);
+		if (!dumper.open())
 		{
 			return false;
 		}
 
 		for (const auto& pixel : image._pixels) {
-			fwrite(&pixel._r, 1, 1, file);
-			fwrite(&pixel._g, 1, 1, file);
-			fwrite(&pixel._b, 1, 1, file);
+			dumper.dump(pixel._r);
+			dumper.dump(pixel._g);
+			dumper.dump(pixel._b);
 		}
-		fflush(file);
 		return true;
 	}
 }

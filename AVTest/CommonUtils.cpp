@@ -1,8 +1,8 @@
-#include "Utils.h"
+#include "CommonUtils.h"
 #include <ctime>
-namespace Utils
+namespace CommonUtils
 {
-	double GetRoutineExecuteTimeConsume(const std::function<void()> func)
+	double get_routine_execute_time_consume(const std::function<void()> func)
 	{
 		const auto start = clock();
 		func();
